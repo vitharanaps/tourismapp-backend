@@ -1,0 +1,49 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+debug.log
+yarn-debug.log*
+pnpm-debug.log*
+
+# Build output
+dist/
+build/
+coverage/
+.next/
+.vercel/
+
+# Uploads / storage
+uploads/
+tmp/
+temp/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+.idea/
+*.iml
+
+# TypeScript (if you add TS later)
+*.tsbuildinfo
+
+# Docker
+docker-data/
