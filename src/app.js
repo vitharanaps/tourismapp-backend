@@ -6,9 +6,8 @@ import 'dotenv/config';
 
 import './config/passport.js';
 import authRoutes from './routes/auth.routes.js';
-import vendorRoutes from "./routes/vendor.routes.js";
+import vendorRouter from "./routes/vendor.routes.js";
 import uploadsRouter  from "./routes/uploads"
-import vendorListingsRouter from "./routes/vendorListings";
 app.use("/api/uploads", uploadsRouter);
 const app = express();
 
@@ -33,8 +32,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use('/auth', authRoutes);
-app.use("/api/vendor", vendorRoutes);
-app.use("/api/vendorListing", vendorListingsRouter);
+app.use("/api/vendor", vendorRouter);
 
 app.get('/', (req, res) => {
   res.send('TourismHub backend running (ESM)');

@@ -1,47 +1,64 @@
 // src/controllers/vendor.controller.js
-import pool from "../config/db.js";
-import { createListing, getListingsByVendor } from "../models/listing.model.js";
+import { Listing } from "../models/Listing.js";
 
-export async function createVendorListing(req, res) {
+// GET /api/vendor/listings
+export const getVendorListings = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const vendorId = req.user.id;
 
-    const vendorResult = await pool.query(
-      "SELECT id FROM vendors WHERE user_id = $1",
-      [userId]
-    );
-    if (vendorResult.rows.length === 0) {
+    const listings = await Listing.find({ vendorId }).lean(); // adjust if using Prisma
+    return res.status(200).json(listings);
+  } catch (err) {
+    console.error("getVendorListings error", err);
+    return res.status(500).json({ message: "Failed to fetch listings" });
+  }
+};
+
+// POST /api/vendor/listings
+export const createVendorListing = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+
+    const {
+      title,
+      description,
+      type,
+      price,
+      currency,
+      images,
+      address,
+      city,
+      country,
+      lat,
+      lng,
+      amenities,
+    } = req.body;
+
+    if (!title || !type || price == null) {
       return res
         .status(400)
-        .json({ message: "No vendor profile for this user" });
+        .json({ message: "Title, type, and price are required" });
     }
-    const vendorId = vendorResult.rows[0].id;
 
-    const listing = await createListing(vendorId, req.body);
-    return res.status(201).json({ listing });
+    const listing = await Listing.create({
+      vendorId,
+      title,
+      description,
+      type,
+      price,
+      currency,
+      images: images || [], // array of B2 URLs from frontend
+      address: address || "",
+      city: city || "",
+      country: country || "",
+      location: lat && lng ? { lat, lng } : null,
+      amenities: amenities || [],
+      status: "active",
+    });
+
+    return res.status(201).json(listing);
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Error creating listing" });
+    console.error("createVendorListing error", err);
+    return res.status(500).json({ message: "Failed to create listing" });
   }
-}
-
-export async function getVendorListings(req, res) {
-  try {
-    const userId = req.user.id;
-
-    const vendorResult = await pool.query(
-      "SELECT id FROM vendors WHERE user_id = $1",
-      [userId]
-    );
-    if (vendorResult.rows.length === 0) {
-      return res.status(200).json({ listings: [] });
-    }
-    const vendorId = vendorResult.rows[0].id;
-
-    const listings = await getListingsByVendor(vendorId);
-    return res.json({ listings });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Error fetching listings" });
-  }
-}
+};
