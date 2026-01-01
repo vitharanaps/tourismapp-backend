@@ -1,5 +1,6 @@
 // src/controllers/user.controller.js
 import * as UserModel from "../models/user.model.js";
+import pool from "../config/db.js";
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { b2Client } from "../b2Client.js";
@@ -68,5 +69,33 @@ export async function toggleWishlist(req, res) {
     } catch (err) {
         console.error("Toggle wishlist error:", err);
         return res.status(500).json({ message: "Failed to update wishlist" });
+    }
+}
+export async function getUserStats(req, res) {
+    try {
+        const userId = req.user.id;
+
+        // Wishlist Count
+        const wishlistRes = await pool.query('SELECT COUNT(*) FROM wishlists WHERE user_id = $1', [userId]);
+        const wishlistCount = parseInt(wishlistRes.rows[0].count, 10);
+
+        // Unread Chat Count
+        // Use ChatModel if imported, or direct query. 
+        // User controller doesn't import ChatModel usually. I'll use direct query to avoid circular deps or just simple query.
+        const unreadRes = await pool.query(
+            `SELECT COUNT(*) as count 
+             FROM messages m
+             JOIN chats c ON m.chat_id = c.id
+             WHERE (c.user_id = $1 OR c.vendor_id = $1) 
+             AND m.sender_id != $1 
+             AND m.is_read = FALSE`,
+            [userId]
+        );
+        const unreadChatCount = parseInt(unreadRes.rows[0].count, 10);
+
+        return res.json({ wishlistCount, unreadChatCount });
+    } catch (err) {
+        console.error("Get user stats error:", err);
+        return res.status(500).json({ message: "Failed to retrieve stats" });
     }
 }

@@ -21,13 +21,14 @@ export async function createListing(vendorId, data) {
 
   const result = await pool.query(
     `INSERT INTO listings
-     (vendor_id, title, description, type, price, currency, images,
+     (vendor_id, business_id, title, description, type, price, currency, images,
       address, city, country, lat, lng, amenities)
      VALUES
-     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      RETURNING *`,
     [
       vendorId,
+      data.business_id,
       title,
       description,
       type,
@@ -46,10 +47,216 @@ export async function createListing(vendorId, data) {
   return result.rows[0];
 }
 
-export async function getListingsByVendor(vendorId) {
+export async function getListingsByVendor(vendorId, businessId = null) {
+  if (businessId) {
+    // If businessId is provided, we fetch by businessId. 
+    // Access control should be handled by the controller/middleware.
+    const result = await pool.query(
+      "SELECT * FROM listings WHERE business_id = $1 AND is_deleted = false ORDER BY created_at DESC",
+      [businessId]
+    );
+    return result.rows;
+  }
+
+  // Fallback to fetch all listings for a vendor across all their businesses
   const result = await pool.query(
-    "SELECT * FROM listings WHERE vendor_id = $1 ORDER BY created_at DESC",
+    "SELECT * FROM listings WHERE vendor_id = $1 AND is_deleted = false ORDER BY created_at DESC",
     [vendorId]
   );
   return result.rows;
+}
+export async function updateListing(listingId, vendorId, data) {
+  const {
+    title,
+    description,
+    type,
+    price,
+    currency,
+    images,
+    address,
+    city,
+    country,
+    lat,
+    lng,
+    amenities,
+  } = data;
+
+  const result = await pool.query(
+    `UPDATE listings
+     SET business_id = $1, title = $2, description = $3, type = $4, price = $5, currency = $6,
+    images = $7, address = $8, city = $9, country = $10, lat = $11,
+    lng = $12, amenities = $13, updated_at = NOW()
+     WHERE id = $14 AND vendor_id = $15
+     RETURNING * `,
+    [
+      data.business_id,
+      title,
+      description,
+      type,
+      price,
+      currency,
+      images,
+      address,
+      city,
+      country,
+      lat,
+      lng,
+      amenities,
+      listingId,
+      vendorId,
+    ]
+  );
+
+  return result.rows[0];
+}
+
+export async function deleteListing(listingId, vendorId) {
+  // Soft delete
+  const result = await pool.query(
+    "UPDATE listings SET is_deleted = true, updated_at = NOW() WHERE id = $1 AND vendor_id = $2 RETURNING id",
+    [listingId, vendorId]
+  );
+  return result.rows[0];
+}
+
+export async function toggleFeaturedStatus(listingId, isFeatured, durationHours = 24) {
+  let expiresAt = null;
+  if (isFeatured) {
+    const date = new Date();
+    date.setHours(date.getHours() + durationHours);
+    expiresAt = date;
+  }
+
+  const result = await pool.query(
+    `UPDATE listings 
+         SET is_featured = $1, featured_expires_at = $2, updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+    [isFeatured, expiresAt, listingId]
+  );
+  return result.rows[0];
+}
+
+// Get filtered listings for explore page
+export async function getFilteredListings(filters = {}) {
+  const { category, city, rating, search, sort = 'newest', page = 1, limit = 12 } = filters;
+  const offset = (page - 1) * limit;
+  
+  let query = `
+    SELECT l.*, 
+           b.name as business_name,
+           c.name as category_name, 
+           c.slug as category_slug,
+           c.icon as category_icon,
+           COALESCE(AVG(r.rating), 0) as avg_rating,
+           COUNT(DISTINCT r.id) as review_count
+    FROM listings l
+    LEFT JOIN businesses b ON l.business_id = b.id
+    LEFT JOIN categories c ON l.category_id = c.id
+    LEFT JOIN reviews r ON l.id = r.listing_id
+    WHERE l.is_active = TRUE
+  `;
+  
+  const params = [];
+  let paramIndex = 1;
+  
+  // Category filter (by slug or ID)
+  if (category) {
+    query += ` AND (c.slug = $${paramIndex} OR l.category_id = $${paramIndex})`;
+    params.push(category);
+    paramIndex++;
+  }
+  
+  // City filter
+  if (city) {
+    query += ` AND l.city ILIKE $${paramIndex}`;
+    params.push(`%${city}%`);
+    paramIndex++;
+  }
+  
+  // Keyword search
+  if (search) {
+    query += ` AND (l.title ILIKE $${paramIndex} OR l.description ILIKE $${paramIndex})`;
+    params.push(`%${search}%`);
+    paramIndex++;
+  }
+  
+  query += ` GROUP BY l.id, b.name, c.name, c.slug, c.icon`;
+  
+  // Rating filter (applied after GROUP BY)
+  if (rating) {
+    query += ` HAVING COALESCE(AVG(r.rating), 0) >= ${parseFloat(rating)}`;
+  }
+  
+  // Sorting
+  switch (sort) {
+    case 'rating':
+      query += ` ORDER BY avg_rating DESC, l.created_at DESC`;
+      break;
+    case 'price_low':
+      query += ` ORDER BY l.price ASC`;
+      break;
+    case 'price_high':
+      query += ` ORDER BY l.price DESC`;
+      break;
+    case 'newest':
+    default:
+      query += ` ORDER BY l.created_at DESC`;
+  }
+  
+  query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+  params.push(limit, offset);
+  
+  const result = await pool.query(query, params);
+  
+  // Get total count (simplified for rating filter)
+  let countQuery = `
+    SELECT COUNT(DISTINCT l.id) as count
+    FROM listings l
+    LEFT JOIN categories c ON l.category_id = c.id
+    WHERE l.is_active = TRUE
+  `;
+  
+  const countParams = [];
+  let countParamIndex = 1;
+  
+  if (category) {
+    countQuery += ` AND (c.slug = $${countParamIndex} OR l.category_id = $${countParamIndex})`;
+    countParams.push(category);
+    countParamIndex++;
+  }
+  
+  if (city) {
+    countQuery += ` AND l.city ILIKE $${countParamIndex}`;
+    countParams.push(`%${city}%`);
+    countParamIndex++;
+  }
+  
+  if (search) {
+    countQuery += ` AND (l.title ILIKE $${countParamIndex} OR l.description ILIKE $${countParamIndex})`;
+    countParams.push(`%${search}%`);
+    countParamIndex++;
+  }
+  
+  const countResult = await pool.query(countQuery, countParams);
+  const total = parseInt(countResult.rows[0].count);
+  
+  return {
+    listings: result.rows,
+    total,
+    page: parseInt(page),
+    totalPages: Math.ceil(total / limit)
+  };
+}
+
+// Get unique cities from listings
+export async function getUniqueCities() {
+  const result = await pool.query(`
+    SELECT DISTINCT city 
+    FROM listings 
+    WHERE city IS NOT NULL AND city != '' AND is_active = TRUE
+    ORDER BY city ASC
+  `);
+  
+  return result.rows.map(row => row.city);
 }

@@ -33,6 +33,11 @@ passport.use(
         let user;
         if (existing.rows.length > 0) {
           user = existing.rows[0];
+
+          // Check if user is blocked
+          if (user.is_blocked) {
+            return done(null, false, { message: 'Your account has been blocked. Please contact support.' });
+          }
         } else {
           // Create new user
           const insert = await pool.query(

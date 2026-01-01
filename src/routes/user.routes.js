@@ -1,7 +1,7 @@
 // src/routes/user.routes.js
 import { Router } from "express";
 import { isAuthenticated } from "../middleware/auth.js";
-import { updateProfile, getWishlist, toggleWishlist } from "../controllers/user.controller.js";
+import { updateProfile, getWishlist, toggleWishlist, getUserStats } from "../controllers/user.controller.js";
 
 import multer from "multer";
 
@@ -14,5 +14,6 @@ router.use(isAuthenticated);
 router.put("/profile", upload.single("avatar"), updateProfile);
 router.get("/wishlist", getWishlist);
 router.post("/wishlist", toggleWishlist);
+router.get("/stats", getUserStats);
 
 export default router;

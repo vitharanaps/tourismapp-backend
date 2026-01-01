@@ -1,17 +1,19 @@
-// routes/bookingFlow.js
+// routes/bookingFlow.js - CORRECT IMPORT
 import express from 'express';
 import * as bookingFlowController from '../controllers/bookingFlow.controller.js';
-import { authMiddleware } from '../middleware/auth.js';
+import * as bookingController from '../controllers/booking.controller.js';
+import { isAuthenticated } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// ✅ USER FLOW
-router.post('/request', authMiddleware, bookingFlowController.sendUserRequest);
-router.get('/status/:listingId', authMiddleware, bookingFlowController.getRequestStatus);
-router.patch('/offers/:offerId/accept', authMiddleware, bookingFlowController.acceptOffer);
+router.post('/request', isAuthenticated, bookingFlowController.sendUserRequest);
+router.get('/status/:listingId', isAuthenticated, bookingFlowController.getRequestStatus);
+router.patch('/offers/:offerId/accept', isAuthenticated, bookingFlowController.acceptOffer);
+router.patch('/offers/:offerId/cancel', isAuthenticated, bookingFlowController.cancelOffer);
 
-// ✅ VENDOR FLOW
-router.post('/offer', authMiddleware, bookingFlowController.sendVendorOffer);
-router.get('/dashboard', authMiddleware, bookingFlowController.getVendorRequests);
+router.post('/offer', isAuthenticated, bookingFlowController.sendVendorOffer);
+router.get('/dashboard', isAuthenticated, bookingFlowController.getVendorRequests);
+router.get('/user-requests', isAuthenticated, bookingFlowController.getUserRequests);
+router.get('/vendor/bookings', isAuthenticated, bookingController.getVendorBookings);
 
 export default router;
