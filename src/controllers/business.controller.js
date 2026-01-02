@@ -4,13 +4,13 @@ import pool from "../config/db.js";
 export async function createBusiness(req, res) {
     try {
         const ownerId = req.user.id;
-        const { name, type, description, address, city, country, logo_url } = req.body;
+        const { name, type, description, address, city, country, logo_url, email, phone } = req.body;
 
         const result = await pool.query(
-            `INSERT INTO businesses (owner_id, name, type, description, address, city, country, logo_url)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            `INSERT INTO businesses (owner_id, name, type, description, address, city, country, logo_url, email, phone)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              RETURNING *`,
-            [ownerId, name, type, description, address, city, country, logo_url]
+            [ownerId, name, type, description, address, city, country, logo_url, email, phone]
         );
 
         return res.status(201).json(result.rows[0]);

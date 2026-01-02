@@ -54,6 +54,8 @@ export const createVendorListing = async (req, res) => {
       lng,
       amenities,
       business_id,
+      category_id,
+      subcategory_id,
     } = req.body;
 
     if (!title || !type || price == null) {
@@ -97,6 +99,21 @@ export const createVendorListing = async (req, res) => {
       parsedAmenities = amenities;
     }
 
+    // Fetch category/subcategory settings for snapshotting
+    let has_booking_flow = true;
+    let date_type = 'range';
+
+    if (category_id || subcategory_id) {
+      const catRes = await pool.query(
+        `SELECT has_booking_flow, date_type FROM categories WHERE id = $1`,
+        [subcategory_id || category_id]
+      );
+      if (catRes.rows[0]) {
+        has_booking_flow = catRes.rows[0].has_booking_flow;
+        date_type = catRes.rows[0].date_type;
+      }
+    }
+
     const listingData = {
       title,
       description,
@@ -111,6 +128,10 @@ export const createVendorListing = async (req, res) => {
       lng,
       amenities: parsedAmenities,
       business_id: business_id ? parseInt(business_id) : null,
+      category_id: category_id ? parseInt(category_id) : null,
+      subcategory_id: subcategory_id ? parseInt(subcategory_id) : null,
+      has_booking_flow: has_booking_flow,
+      date_type: date_type,
     };
 
     console.log("Creating listing with data:", listingData);
@@ -144,6 +165,8 @@ export const updateVendorListing = async (req, res) => {
       amenities,
       existingImages,
       business_id,
+      category_id,
+      subcategory_id,
     } = req.body;
 
     // Handle existing images
@@ -180,6 +203,21 @@ export const updateVendorListing = async (req, res) => {
       parsedAmenities = amenities;
     }
 
+    // Fetch category/subcategory settings for snapshotting
+    let has_booking_flow = true;
+    let date_type = "range";
+
+    if (category_id || subcategory_id) {
+      const catRes = await pool.query(
+        `SELECT has_booking_flow, date_type FROM categories WHERE id = $1`,
+        [subcategory_id || category_id]
+      );
+      if (catRes.rows[0]) {
+        has_booking_flow = catRes.rows[0].has_booking_flow;
+        date_type = catRes.rows[0].date_type;
+      }
+    }
+
     const listingData = {
       title,
       description,
@@ -194,6 +232,10 @@ export const updateVendorListing = async (req, res) => {
       lng,
       amenities: parsedAmenities,
       business_id: business_id ? parseInt(business_id) : null,
+      category_id: category_id ? parseInt(category_id) : undefined,
+      subcategory_id: subcategory_id ? parseInt(subcategory_id) : undefined,
+      has_booking_flow: has_booking_flow,
+      date_type: date_type,
     };
 
     const listing = await updateListing(id, vendorId, listingData);

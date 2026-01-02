@@ -3,7 +3,10 @@ import * as CategoryModel from '../models/category.model.js';
 // Public: Get all active categories
 export async function getCategories(req, res) {
     try {
-        const categories = await CategoryModel.getAllCategories(false);
+        const { mainOnly } = req.query;
+        const categories = mainOnly === 'true'
+            ? await CategoryModel.getMainCategories(false)
+            : await CategoryModel.getAllCategories(false);
         res.json(categories);
     } catch (error) {
         console.error('Error fetching categories:', error);
@@ -59,7 +62,7 @@ export async function getCategoryBySlug(req, res) {
 // Admin: Create new category
 export async function createCategory(req, res) {
     try {
-        const { name, slug, icon, description, display_order } = req.body;
+        const { name, slug, icon, description, display_order, amenities, date_type, has_booking_flow, parent_id } = req.body;
 
         if (!name || !slug || !icon) {
             return res.status(400).json({ message: 'Name, slug, and icon are required' });
@@ -70,7 +73,11 @@ export async function createCategory(req, res) {
             slug,
             icon,
             description,
-            display_order
+            display_order,
+            amenities,
+            date_type,
+            has_booking_flow,
+            parent_id
         });
 
         res.status(201).json(category);
@@ -89,7 +96,7 @@ export async function createCategory(req, res) {
 export async function updateCategory(req, res) {
     try {
         const { id } = req.params;
-        const { name, slug, icon, description, is_active, display_order } = req.body;
+        const { name, slug, icon, description, is_active, display_order, amenities, date_type, has_booking_flow, parent_id } = req.body;
 
         const category = await CategoryModel.updateCategory(id, {
             name,
@@ -97,7 +104,11 @@ export async function updateCategory(req, res) {
             icon,
             description,
             is_active,
-            display_order
+            display_order,
+            amenities,
+            date_type,
+            has_booking_flow,
+            parent_id
         });
 
         if (!category) {

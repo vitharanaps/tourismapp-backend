@@ -1,8 +1,9 @@
+import 'dotenv/config';
 import pool from "../config/db.js";
 
 async function createListingsTable() {
-    try {
-        await pool.query(`
+  try {
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS listings (
         id SERIAL PRIMARY KEY,
         vendor_id INTEGER NOT NULL REFERENCES users(id),
@@ -23,12 +24,12 @@ async function createListingsTable() {
       );
     `);
 
-        console.log("✅ Listings table created/verified successfully!");
-        process.exit(0);
-    } catch (err) {
-        console.error("❌ Error creating listings table:", err);
-        process.exit(1);
-    }
+    console.log("✅ Listings table created/verified successfully!");
+    process.exit(0);
+  } catch (err) {
+    console.error("❌ Error creating listings table:", err);
+    process.exit(1);
+  }
 }
 
 createListingsTable();
