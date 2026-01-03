@@ -21,6 +21,7 @@ export async function createListing(vendorId, data) {
     subcategory_id,
     has_booking_flow,
     date_type,
+    price_unit,
   } = data;
 
   // Inherit location from business if not provided
@@ -40,9 +41,9 @@ export async function createListing(vendorId, data) {
     `INSERT INTO listings
      (vendor_id, business_id, title, description, type, price, currency, images,
       address, city, country, lat, lng, amenities, category_id, subcategory_id,
-      has_booking_flow, date_type)
+      has_booking_flow, date_type, price_unit)
      VALUES
-     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      RETURNING *`,
     [
       vendorId,
@@ -62,7 +63,8 @@ export async function createListing(vendorId, data) {
       category_id,
       subcategory_id,
       has_booking_flow,
-      date_type
+      date_type,
+      price_unit
     ]
   );
 
@@ -105,6 +107,7 @@ export async function updateListing(listingId, vendorId, data) {
     subcategory_id,
     has_booking_flow,
     date_type,
+    price_unit,
   } = data;
 
   const result = await pool.query(
@@ -112,8 +115,8 @@ export async function updateListing(listingId, vendorId, data) {
      SET business_id = $1, title = $2, description = $3, type = $4, price = $5, currency = $6,
     images = $7, address = $8, city = $9, country = $10, lat = $11,
     lng = $12, amenities = $13, category_id = $14, subcategory_id = $15,
-    has_booking_flow = $16, date_type = $17, updated_at = NOW()
-     WHERE id = $18 AND vendor_id = $19
+    has_booking_flow = $16, date_type = $17, price_unit = $18, updated_at = NOW()
+     WHERE id = $19 AND vendor_id = $20
      RETURNING * `,
     [
       data.business_id,
@@ -133,6 +136,7 @@ export async function updateListing(listingId, vendorId, data) {
       subcategory_id,
       has_booking_flow,
       date_type,
+      price_unit,
       listingId,
       vendorId,
     ]
@@ -194,6 +198,7 @@ export async function getFilteredListings(filters = {}) {
            c.name as category_name, 
            c.slug as category_slug,
            c.icon as category_icon,
+           l.price_unit,
            COALESCE(AVG(r.rating), 0) as avg_rating,
            COUNT(DISTINCT r.id) as review_count,
            l.views_count,
@@ -245,7 +250,7 @@ export async function getFilteredListings(filters = {}) {
     paramIndex++;
   }
 
-  query += ` GROUP BY l.id, b.name, c.name, c.slug, c.icon`;
+  query += ` GROUP BY l.id, b.name, c.name, c.slug, c.icon, c.price_unit`;
 
   // Rating filter (applied after GROUP BY)
   if (rating) {
@@ -253,7 +258,7 @@ export async function getFilteredListings(filters = {}) {
   }
 
   // Sorting (FEATURED FIRST)
-const featuredOrder = `
+  const featuredOrder = `
   l.is_featured DESC,
   CASE 
     WHEN l.is_featured = true AND l.featured_expires_at > NOW() THEN 1
@@ -261,20 +266,20 @@ const featuredOrder = `
   END DESC
 `;
 
-switch (sort) {
-  case 'rating':
-    query += ` ORDER BY ${featuredOrder}, avg_rating DESC, l.created_at DESC`;
-    break;
-  case 'price_low':
-    query += ` ORDER BY ${featuredOrder}, l.price ASC`;
-    break;
-  case 'price_high':
-    query += ` ORDER BY ${featuredOrder}, l.price DESC`;
-    break;
-  case 'newest':
-  default:
-    query += ` ORDER BY ${featuredOrder}, l.created_at DESC`;
-}
+  switch (sort) {
+    case 'rating':
+      query += ` ORDER BY ${featuredOrder}, avg_rating DESC, l.created_at DESC`;
+      break;
+    case 'price_low':
+      query += ` ORDER BY ${featuredOrder}, l.price ASC`;
+      break;
+    case 'price_high':
+      query += ` ORDER BY ${featuredOrder}, l.price DESC`;
+      break;
+    case 'newest':
+    default:
+      query += ` ORDER BY ${featuredOrder}, l.created_at DESC`;
+  }
 
 
   query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
@@ -373,6 +378,7 @@ export async function getHomeFeaturedListings(limit = 4) {
     SELECT l.*,
            b.name AS business_name,
            c.name AS category_name,
+           l.price_unit,
            COALESCE(AVG(r.rating), 0) AS avg_rating,
            COUNT(DISTINCT r.id) AS review_count
     FROM listings l
@@ -382,7 +388,7 @@ export async function getHomeFeaturedListings(limit = 4) {
     WHERE l.is_active = TRUE
       AND l.is_featured = TRUE
       AND (l.featured_expires_at IS NULL OR l.featured_expires_at > NOW())
-    GROUP BY l.id, b.name, c.name
+    GROUP BY l.id, b.name, c.name, l.price_unit
     ORDER BY avg_rating DESC, l.created_at DESC
     LIMIT $1
   `, [limit]);

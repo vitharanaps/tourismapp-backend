@@ -43,11 +43,11 @@ export async function getSubcategories(parentId) {
 }
 
 export async function createCategory(data) {
-    const { name, slug, icon, description, display_order, amenities, date_type, has_booking_flow, parent_id } = data;
+    const { name, slug, icon, description, display_order, amenities, date_type, has_booking_flow, parent_id, price_unit } = data;
 
     const result = await pool.query(
-        `INSERT INTO categories (name, slug, icon, description, display_order, amenities, date_type, has_booking_flow, parent_id) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+        `INSERT INTO categories (name, slug, icon, description, display_order, amenities, date_type, has_booking_flow, parent_id, price_unit) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
      RETURNING *`,
         [
             name,
@@ -58,7 +58,8 @@ export async function createCategory(data) {
             amenities || [],
             date_type || 'range',
             has_booking_flow !== undefined ? has_booking_flow : true,
-            parent_id || null
+            parent_id || null,
+            price_unit || 'night'
         ]
     );
 
@@ -66,7 +67,7 @@ export async function createCategory(data) {
 }
 
 export async function updateCategory(id, data) {
-    const { name, slug, icon, description, is_active, display_order, amenities, date_type, has_booking_flow, parent_id } = data;
+    const { name, slug, icon, description, is_active, display_order, amenities, date_type, has_booking_flow, parent_id, price_unit } = data;
 
     const result = await pool.query(
         `UPDATE categories 
@@ -80,10 +81,11 @@ export async function updateCategory(id, data) {
          date_type = COALESCE($8, date_type),
          has_booking_flow = COALESCE($9, has_booking_flow),
          parent_id = $10,
+         price_unit = COALESCE($11, price_unit),
          updated_at = NOW()
-     WHERE id = $11
+     WHERE id = $12
      RETURNING *`,
-        [name, slug, icon, description, is_active, display_order, amenities, date_type, has_booking_flow, parent_id, id]
+        [name, slug, icon, description, is_active, display_order, amenities, date_type, has_booking_flow, parent_id, price_unit, id]
     );
 
     return result.rows[0];

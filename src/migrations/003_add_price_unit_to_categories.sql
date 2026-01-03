@@ -1,0 +1,2 @@
+ALTER TABLE categories
+ADD COLUMN IF NOT EXISTS price_unit VARCHAR(50) DEFAULT 'night';

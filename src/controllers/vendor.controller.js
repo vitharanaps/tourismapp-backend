@@ -56,6 +56,7 @@ export const createVendorListing = async (req, res) => {
       business_id,
       category_id,
       subcategory_id,
+      price_unit // Added
     } = req.body;
 
     if (!title || !type || price == null) {
@@ -132,6 +133,7 @@ export const createVendorListing = async (req, res) => {
       subcategory_id: subcategory_id ? parseInt(subcategory_id) : null,
       has_booking_flow: has_booking_flow,
       date_type: date_type,
+      price_unit, // Added
     };
 
     console.log("Creating listing with data:", listingData);
@@ -167,6 +169,7 @@ export const updateVendorListing = async (req, res) => {
       business_id,
       category_id,
       subcategory_id,
+      price_unit
     } = req.body;
 
     // Handle existing images
@@ -236,6 +239,7 @@ export const updateVendorListing = async (req, res) => {
       subcategory_id: subcategory_id ? parseInt(subcategory_id) : undefined,
       has_booking_flow: has_booking_flow,
       date_type: date_type,
+      price_unit
     };
 
     const listing = await updateListing(id, vendorId, listingData);
