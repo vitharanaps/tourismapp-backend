@@ -167,6 +167,21 @@ export async function toggleFeaturedStatus(listingId, isFeatured, durationHours 
   );
   return result.rows[0];
 }
+// 
+// Clear expired featured listings
+export async function clearExpiredFeaturedListings() {
+  await pool.query(`
+    UPDATE listings
+    SET is_featured = false,
+        featured_expires_at = NULL
+    WHERE is_featured = true
+      AND featured_expires_at IS NOT NULL
+      AND featured_expires_at < NOW()
+      
+  `);
+}
+
+
 
 // Get filtered listings for explore page
 export async function getFilteredListings(filters = {}) {
@@ -237,21 +252,30 @@ export async function getFilteredListings(filters = {}) {
     query += ` HAVING COALESCE(AVG(r.rating), 0) >= ${parseFloat(rating)}`;
   }
 
-  // Sorting
-  switch (sort) {
-    case 'rating':
-      query += ` ORDER BY avg_rating DESC, l.created_at DESC`;
-      break;
-    case 'price_low':
-      query += ` ORDER BY l.price ASC`;
-      break;
-    case 'price_high':
-      query += ` ORDER BY l.price DESC`;
-      break;
-    case 'newest':
-    default:
-      query += ` ORDER BY l.created_at DESC`;
-  }
+  // Sorting (FEATURED FIRST)
+const featuredOrder = `
+  l.is_featured DESC,
+  CASE 
+    WHEN l.is_featured = true AND l.featured_expires_at > NOW() THEN 1
+    ELSE 0
+  END DESC
+`;
+
+switch (sort) {
+  case 'rating':
+    query += ` ORDER BY ${featuredOrder}, avg_rating DESC, l.created_at DESC`;
+    break;
+  case 'price_low':
+    query += ` ORDER BY ${featuredOrder}, l.price ASC`;
+    break;
+  case 'price_high':
+    query += ` ORDER BY ${featuredOrder}, l.price DESC`;
+    break;
+  case 'newest':
+  default:
+    query += ` ORDER BY ${featuredOrder}, l.created_at DESC`;
+}
+
 
   query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
   params.push(limit, offset);
@@ -331,3 +355,38 @@ export async function getUniqueCities() {
 
   return result.rows.map(row => row.city);
 }
+
+// Get home featured listings
+export async function getHomeFeaturedListings(limit = 4) {
+  // 1️⃣ Clear expired featured listings first
+  await pool.query(`
+    UPDATE listings
+    SET is_featured = false,
+        featured_expires_at = NULL
+    WHERE is_featured = true
+      AND featured_expires_at IS NOT NULL
+      AND featured_expires_at < NOW()
+  `);
+
+  // 2️⃣ Fetch top featured listings by rating
+  const result = await pool.query(`
+    SELECT l.*,
+           b.name AS business_name,
+           c.name AS category_name,
+           COALESCE(AVG(r.rating), 0) AS avg_rating,
+           COUNT(DISTINCT r.id) AS review_count
+    FROM listings l
+    LEFT JOIN reviews r ON l.id = r.listing_id
+    LEFT JOIN businesses b ON l.business_id = b.id
+    LEFT JOIN categories c ON l.category_id = c.id
+    WHERE l.is_active = TRUE
+      AND l.is_featured = TRUE
+      AND (l.featured_expires_at IS NULL OR l.featured_expires_at > NOW())
+    GROUP BY l.id, b.name, c.name
+    ORDER BY avg_rating DESC, l.created_at DESC
+    LIMIT $1
+  `, [limit]);
+
+  return result.rows;
+}
+

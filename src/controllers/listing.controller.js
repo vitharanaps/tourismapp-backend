@@ -114,30 +114,68 @@ export async function toggleListingStatus(req, res) {
 
 // Get filtered listings for explore page
 export async function getExploreListings(req, res) {
-    try {
-        const { category, city, rating, search, sort, page, limit, minPrice, maxPrice } = req.query;
+  try {
+    const { category, city, rating, search, sort, page, limit, minPrice, maxPrice } = req.query;
 
-        console.log('Explore Query:', req.query);
+    const ListingModel = await import('../models/listing.model.js');
 
-        const ListingModel = await import('../models/listing.model.js');
-        const result = await ListingModel.getFilteredListings({
-            category,
-            city,
-            rating: rating ? parseFloat(rating) : undefined,
-            search,
-            minPrice,
-            maxPrice,
-            sort,
-            page: page ? parseInt(page) : 1,
-            limit: limit ? parseInt(limit) : 12
-        });
+    // 🔥 AUTO CLEAN EXPIRED FEATURED
+    await ListingModel.clearExpiredFeaturedListings();
 
-        return res.json(result);
-    } catch (err) {
-        console.error('Get explore listings error:', err);
-        return res.status(500).json({ message: 'Failed to retrieve listings' });
-    }
+    const result = await ListingModel.getFilteredListings({
+      category,
+      city,
+      rating: rating ? parseFloat(rating) : undefined,
+      search,
+      minPrice,
+      maxPrice,
+      sort,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 12
+    });
+
+    return res.json(result);
+  } catch (err) {
+    console.error('Get explore listings error:', err);
+    return res.status(500).json({ message: 'Failed to retrieve listings' });
+  }
 }
+
+// feature a listing
+export async function featureListing(req, res) {
+  try {
+    const { id } = req.params;
+    const vendorId = req.user.id;
+    const { durationDays = 30 } = req.body;
+
+    // Verify ownership
+    const check = await pool.query(
+      `SELECT id FROM listings WHERE id = $1 AND vendor_id = $2`,
+      [id, vendorId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // 🔐 PAYMENT SHOULD BE VERIFIED HERE
+    // if (!paymentVerified) return res.status(402).json({ message: "Payment required" });
+
+    const ListingModel = await import('../models/listing.model.js');
+
+    const updated = await ListingModel.toggleFeaturedStatus(
+      id,
+      true,
+      durationDays * 24 // convert days → hours
+    );
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("Feature listing error:", err);
+    return res.status(500).json({ message: "Failed to feature listing" });
+  }
+}
+
 
 // Get unique cities
 export async function getUniqueCities(req, res) {
@@ -149,4 +187,17 @@ export async function getUniqueCities(req, res) {
         console.error('Get unique cities error:', err);
         return res.status(500).json({ message: 'Failed to retrieve cities' });
     }
+}
+// get home featured listings
+export async function getHomeFeaturedListings(req, res) {
+  try {
+    const ListingModel = await import('../models/listing.model.js');
+
+    const featuredListings = await ListingModel.getHomeFeaturedListings(4);
+
+    return res.json(featuredListings);
+  } catch (err) {
+    console.error("Home featured listings error:", err);
+    return res.status(500).json({ message: "Failed to load featured listings" });
+  }
 }
