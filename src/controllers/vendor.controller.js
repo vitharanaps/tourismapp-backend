@@ -56,7 +56,12 @@ export const createVendorListing = async (req, res) => {
       business_id,
       category_id,
       subcategory_id,
-      price_unit // Added
+      price_unit,
+      tour_start_location,
+      tour_end_location,
+      tour_start_date,
+      tour_end_date,
+      tour_capacity
     } = req.body;
 
     if (!title || !type || price == null) {
@@ -133,7 +138,12 @@ export const createVendorListing = async (req, res) => {
       subcategory_id: subcategory_id ? parseInt(subcategory_id) : null,
       has_booking_flow: has_booking_flow,
       date_type: date_type,
-      price_unit, // Added
+      price_unit,
+      tour_start_location: tour_start_location || null,
+      tour_end_location: tour_end_location || null,
+      tour_start_date: tour_start_date || null,
+      tour_end_date: tour_end_date || null,
+      tour_capacity: tour_capacity ? parseInt(tour_capacity) : null,
     };
 
     console.log("Creating listing with data:", listingData);
@@ -169,7 +179,12 @@ export const updateVendorListing = async (req, res) => {
       business_id,
       category_id,
       subcategory_id,
-      price_unit
+      price_unit,
+      tour_start_location,
+      tour_end_location,
+      tour_start_date,
+      tour_end_date,
+      tour_capacity
     } = req.body;
 
     // Handle existing images
@@ -239,7 +254,12 @@ export const updateVendorListing = async (req, res) => {
       subcategory_id: subcategory_id ? parseInt(subcategory_id) : undefined,
       has_booking_flow: has_booking_flow,
       date_type: date_type,
-      price_unit
+      price_unit,
+      tour_start_location: tour_start_location || null,
+      tour_end_location: tour_end_location || null,
+      tour_start_date: tour_start_date || null,
+      tour_end_date: tour_end_date || null,
+      tour_capacity: tour_capacity ? parseInt(tour_capacity) : null,
     };
 
     const listing = await updateListing(id, vendorId, listingData);

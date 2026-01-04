@@ -22,6 +22,11 @@ export async function createListing(vendorId, data) {
     has_booking_flow,
     date_type,
     price_unit,
+    tour_start_location,
+    tour_end_location,
+    tour_start_date,
+    tour_end_date,
+    tour_capacity,
   } = data;
 
   // Inherit location from business if not provided
@@ -41,9 +46,10 @@ export async function createListing(vendorId, data) {
     `INSERT INTO listings
      (vendor_id, business_id, title, description, type, price, currency, images,
       address, city, country, lat, lng, amenities, category_id, subcategory_id,
-      has_booking_flow, date_type, price_unit)
+      has_booking_flow, date_type, price_unit,
+      tour_start_location, tour_end_location, tour_start_date, tour_end_date, tour_capacity)
      VALUES
-     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
      RETURNING *`,
     [
       vendorId,
@@ -64,7 +70,12 @@ export async function createListing(vendorId, data) {
       subcategory_id,
       has_booking_flow,
       date_type,
-      price_unit
+      price_unit,
+      tour_start_location,
+      tour_end_location,
+      tour_start_date,
+      tour_end_date,
+      tour_capacity
     ]
   );
 
@@ -108,6 +119,11 @@ export async function updateListing(listingId, vendorId, data) {
     has_booking_flow,
     date_type,
     price_unit,
+    tour_start_location,
+    tour_end_location,
+    tour_start_date,
+    tour_end_date,
+    tour_capacity,
   } = data;
 
   const result = await pool.query(
@@ -115,8 +131,10 @@ export async function updateListing(listingId, vendorId, data) {
      SET business_id = $1, title = $2, description = $3, type = $4, price = $5, currency = $6,
     images = $7, address = $8, city = $9, country = $10, lat = $11,
     lng = $12, amenities = $13, category_id = $14, subcategory_id = $15,
-    has_booking_flow = $16, date_type = $17, price_unit = $18, updated_at = NOW()
-     WHERE id = $19 AND vendor_id = $20
+    has_booking_flow = $16, date_type = $17, price_unit = $18, 
+    tour_start_location = $19, tour_end_location = $20, tour_start_date = $21, 
+    tour_end_date = $22, tour_capacity = $23, updated_at = NOW()
+     WHERE id = $24 AND vendor_id = $25
      RETURNING * `,
     [
       data.business_id,
@@ -137,6 +155,11 @@ export async function updateListing(listingId, vendorId, data) {
       has_booking_flow,
       date_type,
       price_unit,
+      tour_start_location,
+      tour_end_location,
+      tour_start_date,
+      tour_end_date,
+      tour_capacity,
       listingId,
       vendorId,
     ]
@@ -189,7 +212,7 @@ export async function clearExpiredFeaturedListings() {
 
 // Get filtered listings for explore page
 export async function getFilteredListings(filters = {}) {
-  const { category, city, rating, search, sort = 'newest', page = 1, limit = 12 } = filters;
+  const { category, city, rating, search, sort = 'newest', page = 1, limit = 12, tourStartLocation, tourEndLocation, tourDate, tourCapacity } = filters;
   const offset = (page - 1) * limit;
 
   let query = `
@@ -202,7 +225,8 @@ export async function getFilteredListings(filters = {}) {
            COALESCE(AVG(r.rating), 0) as avg_rating,
            COUNT(DISTINCT r.id) as review_count,
            l.views_count,
-           (SELECT COUNT(*) FROM bookings WHERE listing_id = l.id) as booking_count
+           (SELECT COUNT(*) FROM bookings WHERE listing_id = l.id) as booking_count,
+           (SELECT COALESCE(SUM(guests), 0) FROM bookings WHERE listing_id = l.id AND status != 'cancelled') as booked_seats
     FROM listings l
     LEFT JOIN businesses b ON l.business_id = b.id
     LEFT JOIN categories c ON l.category_id = c.id
@@ -247,6 +271,32 @@ export async function getFilteredListings(filters = {}) {
   if (filters.maxPrice !== undefined) {
     query += ` AND l.price <= $${paramIndex}`;
     params.push(parseFloat(filters.maxPrice));
+    paramIndex++;
+  }
+
+  // Tour Filters
+  if (tourStartLocation) {
+    query += ` AND l.tour_start_location ILIKE $${paramIndex}`;
+    params.push(`%${tourStartLocation}%`);
+    paramIndex++;
+  }
+
+  if (tourEndLocation) {
+    query += ` AND l.tour_end_location ILIKE $${paramIndex}`;
+    params.push(`%${tourEndLocation}%`);
+    paramIndex++;
+  }
+
+  if (tourDate) {
+    // Check if the requested date falls within the tour's start/end date range
+    query += ` AND l.tour_start_date <= $${paramIndex} AND (l.tour_end_date IS NULL OR l.tour_end_date >= $${paramIndex})`;
+    params.push(tourDate);
+    paramIndex++;
+  }
+
+  if (tourCapacity) {
+    query += ` AND l.tour_capacity >= $${paramIndex}`;
+    params.push(parseInt(tourCapacity));
     paramIndex++;
   }
 
@@ -330,6 +380,30 @@ export async function getFilteredListings(filters = {}) {
   if (filters.maxPrice !== undefined) {
     countQuery += ` AND l.price <= $${countParamIndex}`;
     countParams.push(parseFloat(filters.maxPrice));
+    countParamIndex++;
+  }
+
+  if (tourStartLocation) {
+    countQuery += ` AND l.tour_start_location ILIKE $${countParamIndex}`;
+    countParams.push(`%${tourStartLocation}%`);
+    countParamIndex++;
+  }
+
+  if (tourEndLocation) {
+    countQuery += ` AND l.tour_end_location ILIKE $${countParamIndex}`;
+    countParams.push(`%${tourEndLocation}%`);
+    countParamIndex++;
+  }
+
+  if (tourDate) {
+    countQuery += ` AND l.tour_start_date <= $${countParamIndex} AND (l.tour_end_date IS NULL OR l.tour_end_date >= $${countParamIndex})`;
+    countParams.push(tourDate);
+    countParamIndex++;
+  }
+
+  if (tourCapacity) {
+    countQuery += ` AND l.tour_capacity >= $${countParamIndex}`;
+    countParams.push(parseInt(tourCapacity));
     countParamIndex++;
   }
 

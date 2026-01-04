@@ -4,6 +4,32 @@ import pool from "../config/db.js";
 export async function createBooking(userId, data) {
     const { listingId, startDate, endDate, guests, totalPrice, currency } = data;
 
+    // 1. Check Listing Type & Capacity
+    const listingRes = await pool.query(
+        "SELECT type, tour_capacity FROM listings WHERE id = $1",
+        [listingId]
+    );
+    const listing = listingRes.rows[0];
+
+    if (!listing) {
+        throw new Error("Listing not found");
+    }
+
+    if (listing.type === 'tour' && listing.tour_capacity) {
+        // 2. Check existing bookings
+        const bookedRes = await pool.query(
+            `SELECT COALESCE(SUM(guests), 0) as total_guests 
+             FROM bookings 
+             WHERE listing_id = $1 AND status != 'cancelled'`,
+            [listingId]
+        );
+        const currentGuests = parseInt(bookedRes.rows[0].total_guests);
+
+        if (currentGuests + guests > listing.tour_capacity) {
+            throw new Error(`Tour is fully booked. Only ${listing.tour_capacity - currentGuests} seats remaining.`);
+        }
+    }
+
     const result = await pool.query(
         `INSERT INTO bookings
      (user_id, listing_id, start_date, end_date, guests, total_price, currency)
